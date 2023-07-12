@@ -1,90 +1,95 @@
 package com.jluque.spring;
 
-import com.jluque.spring.listener.JobListener;
 import com.jluque.spring.model.Persona;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
-import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
-import org.springframework.batch.item.database.JdbcBatchItemWriter;
-import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
-import org.springframework.batch.item.file.FlatFileItemReader;
-import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
-import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
+import org.springframework.batch.item.database.JdbcCursorItemReader;
+import org.springframework.batch.item.file.FlatFileItemWriter;
+import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
+import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.jdbc.core.RowMapper;
 
 import javax.sql.DataSource;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 @Configuration
 @EnableBatchProcessing
 public class BatchConfiguration {
 
-    @Autowired
+    public static final Logger log = LoggerFactory.getLogger(BatchConfiguration.class);
 
+    @Autowired
     public JobBuilderFactory jobBuilderFactory;
 
     @Autowired
     public StepBuilderFactory stepBuilderFactory;
 
+    @Autowired
+    public DataSource dataSource;
 
-    /**
-     * Lectura del archivo.
-     *
-     * @return
-     */
     @Bean
-    public FlatFileItemReader<Persona> reader() {
-        return new FlatFileItemReaderBuilder<Persona>()
-                .name("personaItemReader")
-                .resource(new ClassPathResource("sample_10k.csv"))
-                .delimited()
-//                .delimiter(";")
-                .names(new String[]{"nombre", "apellido", "direccion", "telefono"})
-                .fieldSetMapper(new BeanWrapperFieldSetMapper<Persona>() {{
-                    setTargetType(Persona.class);
-                }})
-                .linesToSkip(1)
-                .build();
-    }
+    public JdbcCursorItemReader<Persona> executeReader() {
+        log.info("executeReader");
+        JdbcCursorItemReader<Persona> reader = new JdbcCursorItemReader<Persona>();
 
-    /**
-     * Escribe en base de datos los registros leidos en el csv.
-     *
-     * @param dataSource
-     * @return
-     */
-    @Bean
-    public JdbcBatchItemWriter<Persona> writer(DataSource dataSource) {
-        return new JdbcBatchItemWriterBuilder<Persona>()
-                .itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<Persona>())
-                .sql("INSERT INTO persona (nombre, apellido, direccion, telefono) VALUES (:nombre, :apellido, :direccion, :telefono)")
-                .dataSource(dataSource)
-                .build();
+        reader.setDataSource(dataSource);
+        reader.setSql("SELECT nombre, apellido, direccion, telefono FROM persona");
+        reader.setRowMapper(new RowMapper<Persona>() {
+            @Override
+            public Persona mapRow(ResultSet rs, int rowNum) throws SQLException {
+                Persona persona = new Persona();
+                persona.setNombre(rs.getString("nombre"));
+                persona.setApellido(rs.getString("apellido"));
+                persona.setDireccion(rs.getString("direccion"));
+                persona.setTelefono(rs.getString("telefono"));
+                return persona;
+            }
+        });
+        return reader;
     }
 
     @Bean
-    public Job importPersonaJob(JobListener listener, Step step1) {
-        return jobBuilderFactory.get("importPersonaJob")
+    public FlatFileItemWriter<Persona> executeWriter() {
+        log.info("executeWriter");
+
+        FlatFileItemWriter<Persona> writer = new FlatFileItemWriter<Persona>();
+        writer.setResource(new FileSystemResource("C:\\Users\\Julio\\w\\batch-reader\\src\\main\\resources\\csv_output.csv"));
+        DelimitedLineAggregator<Persona> aggregator = new DelimitedLineAggregator<Persona>();
+        BeanWrapperFieldExtractor<Persona> fieldExtractor = new BeanWrapperFieldExtractor<Persona>();
+        fieldExtractor.setNames(new String[]{"nombre", "apellido", "direccion", "telefono"});
+        aggregator.setFieldExtractor(fieldExtractor);
+        writer.setLineAggregator(aggregator);
+        return writer;
+    }
+
+    @Bean
+    public Step executeStep() {
+        return stepBuilderFactory.get("executeStep")
+                .<Persona, Persona>chunk(10)
+                .reader(executeReader())
+//                .processor(processor())
+                .writer(executeWriter())
+                .build();
+    }
+
+    @Bean
+    public Job processJob() {
+        return jobBuilderFactory
+                .get("processJob")
                 .incrementer(new RunIdIncrementer())
-                .listener(listener)
-                .flow(step1)
+                .flow(executeStep())
                 .end()
-                .build();
-    }
-
-    @Bean
-    public Step step1(JdbcBatchItemWriter<Persona> writer){
-        return stepBuilderFactory.get("step1")
-                .<Persona, Persona>chunk(1000)
-                .reader(reader())
-//                .processor()
-                .writer(writer)
                 .build();
     }
 }

@@ -15,3 +15,24 @@ public class Persona {
     private String telefono;
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
