@@ -11,6 +11,7 @@ import org.springframework.batch.core.configuration.annotation.StepBuilderFactor
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.file.FlatFileItemWriter;
+import org.springframework.batch.item.file.builder.FlatFileItemWriterBuilder;
 import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
 import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,16 +62,12 @@ public class BatchConfiguration {
 
     @Bean
     public FlatFileItemWriter<Persona> executeWriter() {
-        log.info("executeWriter");
-
-        FlatFileItemWriter<Persona> writer = new FlatFileItemWriter<Persona>();
-        writer.setResource(new FileSystemResource("C:\\Users\\Julio\\w\\batch-reader\\src\\main\\resources\\csv_output.csv"));
-        DelimitedLineAggregator<Persona> aggregator = new DelimitedLineAggregator<Persona>();
-        BeanWrapperFieldExtractor<Persona> fieldExtractor = new BeanWrapperFieldExtractor<Persona>();
-        fieldExtractor.setNames(new String[]{"nombre", "apellido", "direccion", "telefono"});
-        aggregator.setFieldExtractor(fieldExtractor);
-        writer.setLineAggregator(aggregator);
-        return writer;
+        return new FlatFileItemWriterBuilder<Persona>()
+                .name("executeWriter")
+                .resource(new FileSystemResource("C:\\Users\\Julio\\w\\batch-reader\\src\\main\\resources\\csv_output.csv"))
+                .delimited().delimiter(";")
+                .names(new String[]{"nombre", "apellido", "direccion", "telefono"})
+                .build();
     }
 
     @Bean
