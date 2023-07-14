@@ -1,6 +1,8 @@
 package com.jluque.spring;
 
+import com.jluque.spring.listener.JobListener;
 import com.jluque.spring.model.Persona;
+import com.jluque.spring.processor.PersonaItemProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
@@ -36,8 +38,31 @@ public class BatchConfiguration {
     public DataSource dataSource;
 
     @Bean
+    public Job processJob(JobListener listener) {
+        log.info("> processJob...");
+        return jobBuilderFactory
+                .get("processJob")
+                .incrementer(new RunIdIncrementer())
+                .listener(listener)
+                .flow(executeStep())
+                .end()
+                .build();
+    }
+
+    @Bean
+    public Step executeStep() {
+        log.info("> > executeStep...");
+        return stepBuilderFactory.get("executeStep")
+                .<Persona, Persona>chunk(10)
+                .reader(executeReader())
+                .processor(executeProcessor())
+                .writer(executeWriter())
+                .build();
+    }
+
+    @Bean
     public JdbcCursorItemReader<Persona> executeReader() {
-        log.info("executeReader");
+        log.info("> > > executeReader...");
         return new JdbcCursorItemReaderBuilder<Persona>()
                 .dataSource(this.dataSource)
                 .name("fooReader")
@@ -52,7 +77,14 @@ public class BatchConfiguration {
     }
 
     @Bean
+    public PersonaItemProcessor executeProcessor(){
+        log.info("> > > executeProccesor...");
+        return new PersonaItemProcessor();
+    }
+
+    @Bean
     public FlatFileItemWriter<Persona> executeWriter() {
+        log.info("> > > executeWriter...");
         return new FlatFileItemWriterBuilder<Persona>()
                 .name("executeWriter")
                 .resource(new FileSystemResource("C:\\Users\\Julio\\w\\batch-reader\\src\\main\\resources\\csv_output.csv"))
@@ -61,23 +93,4 @@ public class BatchConfiguration {
                 .build();
     }
 
-    @Bean
-    public Step executeStep() {
-        return stepBuilderFactory.get("executeStep")
-                .<Persona, Persona>chunk(10)
-                .reader(executeReader())
-//                .processor(processor())
-                .writer(executeWriter())
-                .build();
-    }
-
-    @Bean
-    public Job processJob() {
-        return jobBuilderFactory
-                .get("processJob")
-                .incrementer(new RunIdIncrementer())
-                .flow(executeStep())
-                .end()
-                .build();
-    }
 }

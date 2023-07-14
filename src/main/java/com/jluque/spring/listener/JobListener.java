@@ -25,12 +25,12 @@ public class JobListener extends JobExecutionListenerSupport {
 
     @Override
     public void beforeJob(JobExecution jobExecution) {
-        log.info("Ejecutando before JOb");
+        log.info("------> beforeJob");
     }
 
     @Override
     public void afterJob(JobExecution jobExecution) {
-        log.info("Ejecutando after Job");
+        log.info("------> afterJob");
 
         if(jobExecution.getStatus() == BatchStatus.COMPLETED){
             log.info("Finalizo el JOb. Verificar");
