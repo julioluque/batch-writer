@@ -10,19 +10,15 @@ import org.springframework.batch.core.configuration.annotation.JobBuilderFactory
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
+import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
 import org.springframework.batch.item.file.FlatFileItemWriter;
 import org.springframework.batch.item.file.builder.FlatFileItemWriterBuilder;
-import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
-import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.jdbc.core.RowMapper;
 
 import javax.sql.DataSource;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 
 @Configuration
 @EnableBatchProcessing
@@ -42,22 +38,17 @@ public class BatchConfiguration {
     @Bean
     public JdbcCursorItemReader<Persona> executeReader() {
         log.info("executeReader");
-        JdbcCursorItemReader<Persona> reader = new JdbcCursorItemReader<Persona>();
-
-        reader.setDataSource(dataSource);
-        reader.setSql("SELECT nombre, apellido, direccion, telefono FROM persona");
-        reader.setRowMapper(new RowMapper<Persona>() {
-            @Override
-            public Persona mapRow(ResultSet rs, int rowNum) throws SQLException {
-                Persona persona = new Persona();
-                persona.setNombre(rs.getString("nombre"));
-                persona.setApellido(rs.getString("apellido"));
-                persona.setDireccion(rs.getString("direccion"));
-                persona.setTelefono(rs.getString("telefono"));
-                return persona;
-            }
-        });
-        return reader;
+        return new JdbcCursorItemReaderBuilder<Persona>()
+                .dataSource(this.dataSource)
+                .name("fooReader")
+                .sql("SELECT nombre, apellido, direccion, telefono FROM persona")
+                .rowMapper((rs, rowNum) -> Persona.builder()
+                        .nombre(rs.getString("nombre"))
+                        .apellido(rs.getString("apellido"))
+                        .direccion(rs.getString("direccion"))
+                        .telefono(rs.getString("telefono"))
+                        .build())
+                .build();
     }
 
     @Bean
