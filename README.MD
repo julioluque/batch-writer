@@ -8,10 +8,16 @@ Usa la memoria para manipular los metadatos del proceso spring batch.
 
 - writer escribe en base de datos
 - csv to db  
-- Java 8
+- Java 17
 - Spring 2
 - Maven
 - output logs en consola
+
+### Upgrade
+
+- Cambiamos la Jdk a version LTS
+- Configuramos path en intellij y eclipse
+- pruebas ok
 
 
 ### input
